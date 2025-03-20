@@ -200,6 +200,7 @@ button.primary {
   font-size: 24px;
   line-height: 100%;
   letter-spacing: 0.24px;
+  margin: 0 0 64px 0;
 }
 
 .search-wrapper {
@@ -247,7 +248,6 @@ button.primary {
 #wrap h2 {
   font-size: 1.4rem;
   font-weight: bold;
-  margin-bottom: 32px;
 }
 
 .container {
@@ -261,7 +261,6 @@ button.primary {
   background-size: cover;
   height: 500px;
   padding: 48px;
-  background-image: url("https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/stKGOm8UyhuLPR9sZLjs5AkmncA.jpg");
 }
 
 .overlay {
@@ -314,6 +313,35 @@ span.rate-value {
 .title {
   font-size: 3rem;
   font-weight: bold;
+}
+
+.main-title {
+  margin: 64px 80px 0 80px;
+  color: #fff;
+  font-family: Poppins;
+  font-size: 36px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+}
+
+.empty-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  margin: 56px 0 64px;
+}
+
+.empty-content {
+  margin: 36px 0;
+  font-size: 1.4rem;
+  font-weight: bold;
+  font-family: Poppins;
+  font-weight: 600;
+  line-height: 100%;
+  letter-spacing: 0%;
 }
 
 footer.footer {
