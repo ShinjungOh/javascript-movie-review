@@ -35,7 +35,7 @@
     fetch(link.href, fetchOpts);
   }
 })();
-const Header = ({ navigationBar, movie }) => {
+const Header = ({ movie }) => {
   const header = document.createElement("header");
   const backgroundImageUrl = movie && movie.posterPath ? `https://image.tmdb.org/t/p/original${movie.posterPath}` : "images/default-background.jpg";
   header.innerHTML = `
@@ -54,10 +54,6 @@ const Header = ({ navigationBar, movie }) => {
     </div>
   </div>
 `;
-  const topRatedContainer = header.querySelector(".top-rated-container");
-  if (topRatedContainer) {
-    topRatedContainer.prepend(navigationBar);
-  }
   return header;
 };
 const NavigationBar = ({ input }) => {
@@ -90,6 +86,9 @@ const MovieItem = ({ title, voteAverage, posterPath }) => {
 const MovieList = ({ movieItems = [] }) => {
   const movieContainer = document.createElement("section");
   movieContainer.classList.add("movie-container");
+  if (movieItems === null) {
+    return;
+  }
   if (movieItems.length !== 0) {
     const ul = document.createElement("ul");
     ul.classList.add("thumbnail-list");
@@ -138,7 +137,7 @@ const Input = ({ type, placeholder, onSearch }) => {
   });
   return searchWrapper;
 };
-const Button = ({ text, movieType, onClick }) => {
+const Button = ({ text, onClick }) => {
   const detailButton = document.createElement("button");
   detailButton.classList.add("detail-button", "primary");
   detailButton.textContent = text;
@@ -163,6 +162,7 @@ const fetchMovies = (apiUrl = popularApiUrl) => {
     return res.json();
   }).catch((error) => {
     console.error("Error fetching movies:", error);
+    alert("영화 정보를 가져오는 중 오류가 발생했습니다.");
     throw error;
   });
 };
@@ -177,10 +177,19 @@ const moviesPopularState = {
   currentPage: 1,
   totalPages: 0
 };
+const moviesSearchedState = {
+  list: [],
+  currentPage: 1,
+  totalPages: 0
+};
 const isLastPage = (movieType) => {
-  {
+  if (movieType === "popular") {
     return moviesPopularState.currentPage === moviesPopularState.totalPages;
   }
+  if (movieType === "search") {
+    return moviesSearchedState.currentPage === moviesSearchedState.totalPages;
+  }
+  return false;
 };
 const fetchPopularMovies = async (page = 1) => {
   try {
@@ -200,11 +209,15 @@ const fetchSearchedMovies = async (searchQuery, page = 1) => {
       searchQuery
     )}&page=${page}&language=ko-KR&region=ko-KR&include_adult=false`;
     const data = await fetchMovies(url);
-    const movies = data.results.map((item) => mapToMovie(item));
-    console.log(movies);
-    return { movies, currentPage: page, totalPages: data.total_pages };
+    moviesSearchedState.list = data.results.map(
+      (item) => mapToMovie(item)
+    );
+    moviesSearchedState.currentPage = page;
+    moviesSearchedState.totalPages = data.total_pages;
+    return moviesSearchedState.list;
   } catch (error) {
     console.error("Error fetching searched movies:", error);
+    alert("영화 정보를 가져오는 중 오류가 발생했습니다.");
     throw error;
   }
 };
@@ -213,15 +226,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!main) return;
   const title = document.querySelector("h2");
   if (!title) return;
+  const wrap = document.querySelector("#wrap");
+  if (!wrap) return;
+  const header = Header({ movie: null });
+  wrap == null ? void 0 : wrap.prepend(header);
   title.classList.add("main-title");
   title.textContent = "지금 인기 있는 영화";
+  const movieState = {
+    mode: "popular",
+    query: ""
+  };
   const input = Input({
     type: "text",
     placeholder: "검색어를 입력하세요",
     onSearch: async (query) => {
       try {
+        if (header.parentElement) {
+          header.remove();
+        }
+        movieState.mode = "search";
+        movieState.query = query;
         const searchedMovies = await fetchSearchedMovies(query);
-        console.log(">>> 검색 결과:", searchedMovies);
         main.innerHTML = "";
         const movieListComponent = MovieList({
           movieItems: searchedMovies
@@ -230,24 +255,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         main.appendChild(movieListComponent);
       } catch (error) {
         console.error("검색 영화 호출 중 오류 발생:", error);
+        alert("검색 중 오류가 발생했습니다.");
       }
     }
   });
   const navigationBar = NavigationBar({ input });
-  const header = Header({ navigationBar, movie: null });
-  const wrap = document.querySelector("#wrap");
-  wrap == null ? void 0 : wrap.prepend(header);
+  wrap == null ? void 0 : wrap.prepend(navigationBar);
   const renderMovies = () => {
-    const movieListComponent = MovieList({
-      movieItems: moviesPopularState.list
-    });
+    const movieItems = movieState.mode === "popular" ? moviesPopularState.list : moviesSearchedState.list;
+    const movieListComponent = MovieList({ movieItems });
     main.appendChild(movieListComponent);
   };
   try {
     await fetchPopularMovies();
     if (moviesPopularState.list.length > 0) {
       const updatedHeader = Header({
-        navigationBar,
         movie: moviesPopularState.list[0]
       });
       header.replaceWith(updatedHeader);
@@ -255,20 +277,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderMovies();
   } catch (error) {
     console.error("Error in main.ts:", error);
+    alert("영화 정보를 가져오는 중 오류가 발생했습니다.");
   }
   const container = document.querySelector(".container");
   if (!container) return;
   const moreButton = Button({
     text: "더 보기",
-    movieType: "popular",
     onClick: async () => {
-      if (isLastPage()) {
-        alert("마지막 페이지입니다.");
-        moreButton.setAttribute("disabled", "true");
-        return;
+      if (movieState.mode === "popular") {
+        if (isLastPage("popular")) {
+          moreButton.style.display = "none";
+          alert("마지막 페이지입니다.");
+          return;
+        }
+        await fetchPopularMovies(moviesPopularState.currentPage + 1);
+        renderMovies();
+      } else if (movieState.mode === "search") {
+        if (isLastPage("search")) {
+          moreButton.style.display = "none";
+          alert("마지막 페이지입니다.");
+          return;
+        }
+        await fetchSearchedMovies(
+          movieState.query,
+          moviesSearchedState.currentPage + 1
+        );
+        renderMovies();
       }
-      await fetchPopularMovies(moviesPopularState.currentPage + 1);
-      renderMovies();
     }
   });
   container == null ? void 0 : container.appendChild(moreButton);
