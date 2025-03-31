@@ -125,26 +125,22 @@ const SearchInput = ({ type, placeholder, onSubmit }) => {
   return searchWrapper;
 };
 const Skeleton = {
-  render: (el) => {
+  render: (el, count = 8) => {
     const $skeletonUl = createElement("ul", {
-      class: ["skeleton-list"],
-      innerHTML: `
-    <li></li>
-    <li></li>
-    <li></li>
-    <li></li>
-    <li></li>
-    <li></li>
-    <li></li>
-    <li></li>
-    <li></li>
-    <li></li>`
+      class: ["skeleton-list"]
     });
+    const $skeletonItems = Array.from(
+      { length: count },
+      () => createElement("li", {})
+    );
+    $skeletonUl.append(...$skeletonItems);
     el.appendChild($skeletonUl);
-    return $skeletonUl;
   },
-  remove: ($skeleton) => {
-    $skeleton.remove();
+  remove: () => {
+    const $skeletonUl = $(".skeleton-list");
+    if ($skeletonUl) {
+      $skeletonUl.remove();
+    }
   }
 };
 const baseApiUrl = "https://api.themoviedb.org/3";
@@ -192,7 +188,9 @@ const mapToMovie = (apiData) => ({
   id: apiData.id,
   title: apiData.title,
   rating: Number(apiData.vote_average.toFixed(1)),
-  imageSrc: apiData.poster_path
+  imageSrc: apiData.poster_path,
+  description: apiData.overview,
+  releaseDate: apiData.release_date
 });
 const state = {
   list: [],
@@ -212,6 +210,7 @@ const fetchMovies = async (page, query, isFirstLoad = false) => {
       updateState({ list: [] });
     }
     const response = !query ? await movieApi.fetchPopularMovies(page) : await movieApi.fetchSearchedMovies(query, page);
+    console.log(response.results);
     const movies = response.results.map(mapToMovie);
     const { list } = getState();
     updateState({
@@ -256,7 +255,6 @@ const CardItem = ({ id, title, rating, imageSrc, onShowDetail }) => {
   return $cardItem;
 };
 const Modal = ({ item }) => {
-  const { title, description } = item;
   const $body = $("body");
   const $modalBackground = createElement("div", {
     class: ["modal-background", "active"],
@@ -285,6 +283,9 @@ const Modal = ({ item }) => {
       closeModal();
     }
   };
+  const extractYear = (date) => {
+    return date.slice(0, 4);
+  };
   $modalBackground.addEventListener("click", handleClickBackDrop);
   document.addEventListener("keydown", handleKeyDownESC);
   $modal.innerHTML = `
@@ -294,18 +295,18 @@ const Modal = ({ item }) => {
         <div class="modal-container">
           <div class="modal-image">
             <img
-              src="${item.imageSrc ? `https://image.tmdb.org/t/p/w500${item.imageSrc}` : "images/nullImage.png"}" alt="${title}"
+              src="${item.imageSrc ? `https://image.tmdb.org/t/p/w500${item.imageSrc}` : "images/nullImage.png"}" alt="${item.title}"
             />
           </div>
           <div class="modal-description">
           <div class="modal-header">
-          ${title ? `<h2>${title}</h2>` : "인사이드 아웃 2"}
+          ${item.title ? `<h2>${item.title}</h2>` : "인사이드 아웃 2"}
             <p class="category">
-              2024 · 모험, 애니메이션, 코미디, 드라마, 가족
+              <span>${extractYear(item.releaseDate)}</span> · 모험, 애니메이션, 코미디, 드라마, 가족
             </p>
             <div class="rate-container">
               <span class="average">평균</span>
-              <img src="images/star_filled.png" class="star" /><span>7.7</span>
+              <img src="images/star_filled.png" class="star" /><span>${item.rating}</span>
             </div>
           </div>
           <hr />
@@ -326,15 +327,7 @@ const Modal = ({ item }) => {
             <hr />
             
             <h3>줄거리</h3>
-            ${description ? `<p class="detail">${description}</p>` : `<p class="detail">
-              13살이 된 라일리의 행복을 위해 매일 바쁘게 머릿속 감정 컨트롤
-              본부를 운영하는 ‘기쁨’, ‘슬픔’, ‘버럭’, ‘까칠’, ‘소심’. 그러던
-              어느 날, 낯선 감정인 ‘불안’, ‘당황’, ‘따분’, ‘부럽’이가 본부에
-              등장하고, 언제나 최악의 상황을 대비하며 제멋대로인 ‘불안’이와 기존
-              감정들은 계속 충돌한다. 결국 새로운 감정들에 의해 본부에서
-              쫓겨나게 된 기존 감정들은 다시 본부로 돌아가기 위해 위험천만한
-              모험을 시작하는데…
-            </p>`}
+            ${item.description ? `<p class="detail">${item.description}</p>` : `<p class="detail">줄거리 요약이 없습니다.</p>`}
           </div>
         </div>
 `;
@@ -343,36 +336,40 @@ const Modal = ({ item }) => {
   $modal.addEventListener("click", handleClickBackDrop);
   return $modal;
 };
-const CardList = ({ items = [], el }) => {
+const CardList = ({ items = [], el, isAppend = false }) => {
   const render = () => {
+    if (items.length === 0) return;
+    const $fragment = document.createDocumentFragment();
+    const cardItems = items.map(
+      (item) => CardItem({
+        id: item.id,
+        title: item.title,
+        rating: item.rating,
+        imageSrc: item.imageSrc,
+        description: item.description,
+        onShowDetail: () => handleShowDetail(item.id)
+      })
+    );
+    $fragment.append(...cardItems);
+    if (isAppend) {
+      const $existingList = el.querySelector(".thumbnail-list");
+      if ($existingList) {
+        $existingList.appendChild($fragment);
+        return;
+      }
+    }
     const $movieContainer = createElement("section", {
       class: ["movie-container"]
     });
     const $ul = createElement("ul", {
       class: ["thumbnail-list"]
     });
-    const $fragment = document.createDocumentFragment();
-    if (items.length !== 0) {
-      const cardItems = items.map(
-        (item) => CardItem({
-          id: item.id,
-          title: item.title,
-          rating: item.rating,
-          imageSrc: item.imageSrc,
-          description: item.description,
-          onShowDetail: () => handleShowDetail(item.id)
-        })
-      );
-      $fragment.append(...cardItems);
-      $ul.appendChild($fragment);
-      $movieContainer.appendChild($ul);
-      el.appendChild($movieContainer);
-    }
+    $ul.appendChild($fragment);
+    $movieContainer.appendChild($ul);
+    el.appendChild($movieContainer);
   };
   const handleShowDetail = (id) => {
-    const targetItem = items.find(
-      (item) => item.id === id
-    );
+    const targetItem = items.find((item) => item.id === id);
     if (!targetItem) return;
     const $modal = Modal({ item: targetItem });
     document.body.appendChild($modal);
@@ -383,23 +380,28 @@ const CardList = ({ items = [], el }) => {
   render();
 };
 const $main = document.querySelector("main");
-const $sentinel = document.getElementById("scroll-sentinel");
-const observer = new IntersectionObserver(async (entries, observer2) => {
-  if (!$main) return;
-  for (const entry of entries) {
-    if (entry.isIntersecting) {
-      const { currentPage, totalPages, query, isLoading } = getState();
-      if (isLoading || currentPage === totalPages) {
-        if (currentPage === totalPages) observer2.disconnect();
-        return;
+const $loadTrigger = document.getElementById("load-trigger");
+const scrollObserver = new IntersectionObserver(
+  async (entries, observer) => {
+    if (!$main) return;
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const { currentPage, totalPages, query, isLoading } = getState();
+        if (isLoading || currentPage === totalPages) {
+          if (currentPage === totalPages) observer.disconnect();
+          return;
+        }
+        updateState({ isLoading: true });
+        loadMoreMovies($main);
+        await fetchMovies(currentPage + 1, query);
+        loadMoreMovies($main);
       }
-      await fetchMovies(currentPage + 1, query);
-      renderMovies($main);
     }
-  }
-}, { threshold: 0.1 });
-if ($sentinel) {
-  observer.observe($sentinel);
+  },
+  { threshold: 0.1 }
+);
+if ($loadTrigger) {
+  scrollObserver.observe($loadTrigger);
 }
 const renderTitle = ($container) => {
   const movieSectionTitle = Title({ text: "지금 인기 있는 영화" });
@@ -408,6 +410,10 @@ const renderTitle = ($container) => {
 const renderMovies = ($main2) => {
   const state2 = getState();
   $main2.innerHTML = "";
+  if (state2.isLoading) {
+    Skeleton.render($main2);
+    return;
+  }
   if (state2.query) {
     const searchedMovieTitle = Title({
       text: `"${state2.query}" 검색 결과`
@@ -417,7 +423,7 @@ const renderMovies = ($main2) => {
   } else {
     renderTitle($main2);
   }
-  if (state2.list.length === 0 && !state2.isLoading) {
+  if (state2.list.length === 0) {
     const emptySection = createElement("section", {
       class: ["empty-container"],
       innerHTML: `<img src="images/empty_logo.png" alt="우아한테크코스 로고" />
@@ -430,12 +436,43 @@ const renderMovies = ($main2) => {
     items: state2.list,
     el: $main2
   });
-  if (state2.isLoading) {
-    Skeleton.render($main2);
+  const $loadTrigger2 = createElement("div", { id: "load-trigger" });
+  $main2.appendChild($loadTrigger2);
+  scrollObserver.observe($loadTrigger2);
+};
+const loadMoreMovies = ($main2) => {
+  var _a;
+  const state2 = getState();
+  const $existingLoadTrigger = $("#load-trigger");
+  if ($existingLoadTrigger) {
+    $existingLoadTrigger.remove();
   }
-  const $sentinel2 = createElement("div", { id: "scroll-sentinel" });
-  $main2.appendChild($sentinel2);
-  observer.observe($sentinel2);
+  if (state2.isLoading) {
+    const $loadingMore = createElement("div", {
+      id: "loading-more"
+    });
+    $main2.appendChild($loadingMore);
+    Skeleton.render($loadingMore);
+    return;
+  } else {
+    (_a = $("#loading-more")) == null ? void 0 : _a.remove();
+  }
+  if (state2.currentPage <= 1) {
+    renderMovies($main2);
+    return;
+  }
+  const totalItems = state2.list.length;
+  const itemsPerPage = Math.ceil(totalItems / state2.currentPage);
+  const startIndex = Math.max(0, totalItems - itemsPerPage);
+  const newItems = state2.list.slice(startIndex);
+  CardList({
+    items: newItems,
+    el: $main2,
+    isAppend: true
+  });
+  const $loadTrigger2 = createElement("div", { id: "load-trigger" });
+  $main2.appendChild($loadTrigger2);
+  scrollObserver.observe($loadTrigger2);
 };
 document.addEventListener("DOMContentLoaded", async () => {
   const $main2 = $("main");

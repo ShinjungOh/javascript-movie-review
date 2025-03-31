@@ -381,6 +381,54 @@ footer.footer p:not(:last-child) {
         font-size: 1rem;
     }
 }
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+    #wrap {
+        position: relative;
+        min-width: 0;
+        background-color: var(--color-bluegray-100);
+    }
+
+    .container {
+        max-width: 100%;
+        padding: 0 16px;
+    }
+
+    main {
+        margin: 32px 32px 32px 32px;
+        align-items: center;
+    }
+
+    .main-title {
+        font-size: 48px;
+        margin: 32px 0 56px 0;
+        font-weight: 600;
+        line-height: 100%;
+    }
+
+    .search-result-title {
+        font-size: 48px;
+        font-weight: 600;
+        line-height: 100%;
+        text-align: center;
+        margin: 60px 0 56px 0;
+    }
+
+    .detail-button {
+        width: 100%;
+        font-size: 18px;
+        margin-bottom: 32px;
+    }
+
+    .empty-content {
+        font-size: 1.2rem;
+    }
+
+    footer.footer {
+        width: 100%;
+        font-size: 1rem;
+    }
+}
 :root {
   --color-white: #ffffff;
   --color-lightblue-90: #0da9fd;
@@ -531,7 +579,7 @@ span.rate-value {
     }
 
     .background-container {
-        width: 700px;
+        width: 100%;
         height: 300px;
         padding-top: 40px;
     }
@@ -567,6 +615,67 @@ span.rate-value {
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
+    .navigation-container {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .search-wrapper {
+        width: 500px;
+        height: 36px;
+        justify-content: center;
+        align-items: center;
+        margin: 22px 0 0 0;
+    }
+
+    h1.logo {
+        font-size: 2rem;
+        cursor: pointer;
+    }
+
+    .background-container {
+        width: 100%;
+        height: 400px;
+        padding: 48px;
+        background-position: center center;
+        background-size: cover;
+    }
+
+    .top-rated-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        max-width: 900px;
+        width: 700px;
+        height: 420px;
+    }
+
+    .title {
+        font-size: 2rem;
+        font-weight: bold;
+        line-height: 1.2;
+    }
+
+    .rate {
+        display: flex;
+        flex-direction: row;
+    }
+
+    .top-rated-movie > *:not(:last-child) {
+        margin-bottom: 12px;
+        justify-content: flex-start;
+    }
+
+    .top-rated-movie {
+        margin-top: 48px;
+    }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
     .navigation-container {
         width: 100%;
         display: flex;
@@ -883,6 +992,59 @@ p.rate > span {
         aspect-ratio: 2/3;
     }
 }
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+    .thumbnail-list {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 70px;
+        margin-bottom: 32px;
+    }
+
+    .thumbnail {
+        width: 100%;
+        aspect-ratio: 2/3;
+        object-fit: cover;
+    }
+
+    .item {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .item-desc {
+        text-align: left;
+    }
+
+    .item-desc > *:not(:last-child) {
+        font-size: 0.9rem;
+        margin-bottom: 2px;
+    }
+
+    .item .star {
+        width: 14px;
+    }
+
+    p.rate {
+        justify-content: flex-start;
+        font-size: 0.9rem;
+        margin: 10px 0 10px 0;
+        max-width: 40px;
+    }
+
+    .skeleton-list {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 70px;
+        margin-bottom: 32px;
+    }
+
+    .skeleton-list li {
+        width: 100%;
+        aspect-ratio: 2/3;
+    }
+}
 :root {
   --color-white: #ffffff;
   --color-lightblue-90: #0da9fd;
@@ -993,6 +1155,10 @@ body.modal-open {
 
 .rate-container span {
     color: var(--color-yellow);
+}
+
+.star-container {
+    cursor: pointer;
 }
 
 .modal-description h3 {
@@ -1176,5 +1342,13 @@ body.modal-open {
         top: 16px;
         right: 16px;
         font-size: 18px;
+    }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+    .modal {
+        padding: 40px 24px 40px 24px;
+        border-radius: 16px 16px 0 0;
+        border: none;
     }
 }
