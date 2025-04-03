@@ -143,9 +143,6 @@ const Skeleton = {
     }
   }
 };
-const baseApiUrl = "https://api.themoviedb.org/3";
-const popularApiUrl = `${baseApiUrl}/movie/popular`;
-const searchApiUrl = `${baseApiUrl}/search/movie`;
 const bearerToken = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiNGU1NGJlODQwY2FhYzExNzgyZGUxNGJkMDQwNzRmMiIsIm5iZiI6MTc0MjM0ODk5NC4yOTQwMDAxLCJzdWIiOiI2N2RhMjJjMjU5NGNhYzFlZTc2YzljYmYiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.zw0K-a5QDd-934P_PzqgLdb-GT3pErrWixR39vsXZqs";
 const defaultOptions = {
   method: "GET",
@@ -170,6 +167,10 @@ const http = {
     return http.request(url, defaultOptions);
   }
 };
+const baseApiUrl = "https://api.themoviedb.org/3";
+const movieDetailApiUrl = `${baseApiUrl}/movie`;
+const popularApiUrl = `${movieDetailApiUrl}/popular`;
+const searchApiUrl = `${baseApiUrl}/search/movie`;
 const fetchPopularMovies = (page = 1) => {
   return http.get(`${popularApiUrl}?language=ko-KR&region=ko-KR&page=${page}`);
 };
@@ -180,9 +181,13 @@ const fetchSearchedMovies = (searchQuery, page = 1) => {
   const url = `${searchApiUrl}?${queryString}`;
   return http.get(url);
 };
+const fetchMovieDetail$1 = (movieId) => {
+  return http.get(`${movieDetailApiUrl}/${movieId}?language=ko-KR`);
+};
 const movieApi = {
   fetchPopularMovies,
-  fetchSearchedMovies
+  fetchSearchedMovies,
+  fetchMovieDetail: fetchMovieDetail$1
 };
 const mapToMovie = (apiData) => ({
   id: apiData.id,
@@ -190,7 +195,8 @@ const mapToMovie = (apiData) => ({
   rating: Number(apiData.vote_average.toFixed(1)),
   imageSrc: apiData.poster_path,
   description: apiData.overview,
-  releaseDate: apiData.release_date
+  releaseDate: apiData.release_date,
+  genres: apiData.genres || []
 });
 const state = {
   list: [],
@@ -210,7 +216,6 @@ const fetchMovies = async (page, query, isFirstLoad = false) => {
       updateState({ list: [] });
     }
     const response = !query ? await movieApi.fetchPopularMovies(page) : await movieApi.fetchSearchedMovies(query, page);
-    console.log(response.results);
     const movies = response.results.map(mapToMovie);
     const { list } = getState();
     updateState({
@@ -227,6 +232,9 @@ const fetchMovies = async (page, query, isFirstLoad = false) => {
     throw error;
   }
 };
+const fetchMovieDetail = async (movieId) => {
+  return await movieApi.fetchMovieDetail(movieId).then(mapToMovie);
+};
 const Title = ({ text }) => {
   const $title = createElement("h2", {
     class: ["main-title"],
@@ -234,12 +242,16 @@ const Title = ({ text }) => {
   });
   return $title;
 };
-const CardItem = ({ id, title, rating, imageSrc, onShowDetail }) => {
-  const mappedImage = imageSrc ? `https://image.tmdb.org/t/p/w500${imageSrc}` : "images/nullImage.png";
+const mappedImage = (imageSrc) => {
+  const mappedImage2 = imageSrc ? `https://image.tmdb.org/t/p/w500${imageSrc}` : "images/nullImage.png";
+  return mappedImage2;
+};
+const CardItem = ({ id, title, rating, imageSrc, onClick }) => {
+  const mappedImg = imageSrc ? mappedImage(imageSrc) : "";
   const $cardItem = createElement("li", {
     innerHTML: `
     <div class="item">
-      <img class="thumbnail" src="${mappedImage}" alt="${title}" />
+      <img class="thumbnail" src="${mappedImg}" alt="${title}" />
       <div class="item-desc">
         <p class="rate">
           <img src="images/star_empty.png" class="star" /><span>${rating}</span>
@@ -250,11 +262,52 @@ const CardItem = ({ id, title, rating, imageSrc, onShowDetail }) => {
   `
   });
   $cardItem.addEventListener("click", () => {
-    onShowDetail(id);
+    onClick(id);
   });
   return $cardItem;
 };
+const createStorage = (key, storage = typeof window !== "undefined" ? window.localStorage : void 0) => {
+  if (!storage) {
+    throw new Error("storage를 사용할 수 없습니다.");
+  }
+  const get = () => {
+    const item = storage.getItem(key);
+    if (!item) return null;
+    try {
+      return JSON.parse(item);
+    } catch (error) {
+      console.error(`Error parsing localStorage item for key "${key}":`, error);
+      return null;
+    }
+  };
+  const set = (value) => {
+    try {
+      const jsonValue = JSON.stringify(value);
+      storage.setItem(key, jsonValue);
+    } catch (error) {
+      console.error(`Error setting localStorage item for key "${key}":`, error);
+    }
+  };
+  const remove = () => {
+    storage.removeItem(key);
+  };
+  return { get, set, remove };
+};
+createStorage("movies");
+const RATING_MESSAGES = {
+  0: "별점을 남겨 주세요",
+  2: "별로였어요",
+  4: "아쉬운 작품이에요",
+  6: "그럭저럭 볼만했어요",
+  8: "재밌게 봤어요",
+  10: "명작이에요"
+};
+const movieRatingsStorage = createStorage("movieRatings");
 const Modal = ({ item }) => {
+  const { id } = item;
+  const modalState = {
+    userRating: 0
+  };
   const $body = $("body");
   const $modalBackground = createElement("div", {
     class: ["modal-background", "active"],
@@ -283,8 +336,62 @@ const Modal = ({ item }) => {
       closeModal();
     }
   };
+  const getUserRating = (movieId) => {
+    const ratings = movieRatingsStorage.get();
+    if (!ratings || !Array.isArray(ratings)) {
+      return 0;
+    }
+    const userRating = ratings.find(
+      (rating) => rating.movieId === movieId
+    );
+    return userRating ? userRating.rating : 0;
+  };
+  const saveUserRating = (movieId, rating) => {
+    const ratings = movieRatingsStorage.get() || [];
+    const existingRatingIndex = ratings.findIndex(
+      (rating2) => rating2.movieId === movieId
+    );
+    if (existingRatingIndex !== -1) {
+      ratings[existingRatingIndex].rating = rating;
+    } else {
+      ratings.push({ movieId, rating });
+    }
+    movieRatingsStorage.set(ratings);
+    return rating;
+  };
+  const handleStarClick = (event) => {
+    const target = event.target;
+    if (!target.classList.contains("star-item")) return;
+    const rating = parseInt(target.dataset.value || "0", 10);
+    modalState.userRating = saveUserRating(id, rating);
+    renderStars(modalState.userRating);
+    updateRatingMessage(modalState.userRating);
+  };
+  const renderStars = (rating) => {
+    const starContainer2 = $modal.querySelector(".star-container");
+    if (!starContainer2) return;
+    starContainer2.innerHTML = "";
+    for (const i of [2, 4, 6, 8, 10]) {
+      const starClass = i <= rating ? "star_filled.png" : "star_empty.png";
+      const star = createElement("img");
+      star.src = `images/${starClass}`;
+      star.classList.add("star");
+      star.classList.add("star-item");
+      star.dataset.value = i.toString();
+      starContainer2.appendChild(star);
+    }
+  };
+  const updateRatingMessage = (rating) => {
+    const ratingMessage = $modal.querySelector(".rating-message");
+    if (!ratingMessage) return;
+    const message = RATING_MESSAGES[rating] || RATING_MESSAGES[0];
+    ratingMessage.textContent = rating > 0 ? `${message}(${rating}/10)` : message;
+  };
   const extractYear = (date) => {
     return date.slice(0, 4);
+  };
+  const formatGenres = (genres) => {
+    return genres.map((genre) => genre.name).join(", ");
   };
   $modalBackground.addEventListener("click", handleClickBackDrop);
   document.addEventListener("keydown", handleKeyDownESC);
@@ -295,14 +402,15 @@ const Modal = ({ item }) => {
         <div class="modal-container">
           <div class="modal-image">
             <img
-              src="${item.imageSrc ? `https://image.tmdb.org/t/p/w500${item.imageSrc}` : "images/nullImage.png"}" alt="${item.title}"
+              src="${item.imageSrc ? mappedImage(item.imageSrc) : ""}" alt="${item.title}"
             />
           </div>
           <div class="modal-description">
           <div class="modal-header">
-          ${item.title ? `<h2>${item.title}</h2>` : "인사이드 아웃 2"}
+          ${item.title ? `<h2>${item.title}</h2>` : "영화 제목 없음"}
+          
             <p class="category">
-              <span>${extractYear(item.releaseDate)}</span> · 모험, 애니메이션, 코미디, 드라마, 가족
+              <span>${extractYear(item.releaseDate)}</span> · 로딩중...
             </p>
             <div class="rate-container">
               <span class="average">평균</span>
@@ -315,13 +423,9 @@ const Modal = ({ item }) => {
             <h3>내 별점</h3>
             <div class="my-rate-content">
             <div class="star-container">
-              <img src="images/star_filled.png" class="star" />
-              <img src="images/star_filled.png" class="star" />
-              <img src="images/star_filled.png" class="star" />
-              <img src="images/star_filled.png" class="star" />
-              <img src="images/star_empty.png" class="star" />
+              <!-- 별점 동적으로 추가 -->
             </div>
-            <span>명작이에요(8/10)</span>
+            <span class="rating-message">${RATING_MESSAGES[0]}</span>
             </div>
             </div>
             <hr />
@@ -334,6 +438,26 @@ const Modal = ({ item }) => {
   const closeButton = $modal.querySelector(".close-modal");
   closeButton == null ? void 0 : closeButton.addEventListener("click", handleClickClose);
   $modal.addEventListener("click", handleClickBackDrop);
+  const starContainer = $modal.querySelector(".star-container");
+  starContainer == null ? void 0 : starContainer.addEventListener("click", handleStarClick);
+  modalState.userRating = getUserRating(id);
+  renderStars(modalState.userRating);
+  updateRatingMessage(modalState.userRating);
+  const loadMovieDetail = async () => {
+    try {
+      const movieDetail = await fetchMovieDetail(item.id);
+      const genresText = movieDetail.genres && movieDetail.genres.length > 0 ? formatGenres(movieDetail.genres) : "장르 정보 없음";
+      const $category = $modal.querySelector(".category");
+      if ($category) {
+        $category.innerHTML = `<span>${extractYear(
+          item.releaseDate
+        )}</span> · ${genresText}`;
+      }
+    } catch (error) {
+      console.error("영화 상세 정보를 불러오는데 실패했습니다.", error);
+    }
+  };
+  loadMovieDetail();
   return $modal;
 };
 const CardList = ({ items = [], el, isAppend = false }) => {
@@ -347,7 +471,7 @@ const CardList = ({ items = [], el, isAppend = false }) => {
         rating: item.rating,
         imageSrc: item.imageSrc,
         description: item.description,
-        onShowDetail: () => handleShowDetail(item.id)
+        onClick: () => handleShowDetail(item.id)
       })
     );
     $fragment.append(...cardItems);
@@ -379,24 +503,23 @@ const CardList = ({ items = [], el, isAppend = false }) => {
   };
   render();
 };
-const $main = document.querySelector("main");
-const $loadTrigger = document.getElementById("load-trigger");
+const $main = $("main");
+const $loadTrigger = $("load-trigger");
 const scrollObserver = new IntersectionObserver(
   async (entries, observer) => {
     if (!$main) return;
-    for (const entry of entries) {
-      if (entry.isIntersecting) {
-        const { currentPage, totalPages, query, isLoading } = getState();
-        if (isLoading || currentPage === totalPages) {
-          if (currentPage === totalPages) observer.disconnect();
-          return;
-        }
-        updateState({ isLoading: true });
-        loadMoreMovies($main);
-        await fetchMovies(currentPage + 1, query);
-        loadMoreMovies($main);
-      }
+    if (!entries.some((entry) => entry.isIntersecting)) {
+      return;
     }
+    const { currentPage, totalPages, query, isLoading } = getState();
+    if (isLoading || currentPage === totalPages) {
+      if (currentPage === totalPages) observer.disconnect();
+      return;
+    }
+    updateState({ isLoading: true });
+    showLoadingIndicator($main);
+    await fetchMovies(currentPage + 1, query);
+    appendNewMovies($main);
   },
   { threshold: 0.1 }
 );
@@ -440,23 +563,19 @@ const renderMovies = ($main2) => {
   $main2.appendChild($loadTrigger2);
   scrollObserver.observe($loadTrigger2);
 };
-const loadMoreMovies = ($main2) => {
-  var _a;
-  const state2 = getState();
+const showLoadingIndicator = ($main2) => {
   const $existingLoadTrigger = $("#load-trigger");
   if ($existingLoadTrigger) {
     $existingLoadTrigger.remove();
   }
-  if (state2.isLoading) {
-    const $loadingMore = createElement("div", {
-      id: "loading-more"
-    });
-    $main2.appendChild($loadingMore);
-    Skeleton.render($loadingMore);
-    return;
-  } else {
-    (_a = $("#loading-more")) == null ? void 0 : _a.remove();
-  }
+  const $loadingMore = createElement("div", { id: "loading-more" });
+  $main2.appendChild($loadingMore);
+  Skeleton.render($loadingMore);
+};
+const appendNewMovies = ($main2) => {
+  var _a;
+  (_a = $("#loading-more")) == null ? void 0 : _a.remove();
+  const state2 = getState();
   if (state2.currentPage <= 1) {
     renderMovies($main2);
     return;
@@ -495,6 +614,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         const updatedHeader = Header({ movie: list[0] });
         header.replaceWith(updatedHeader);
       }
+      const $header = $("#app-header");
+      const $navigation = $(".navigation-container");
+      if ($header) $header.style.display = "none";
+      if ($navigation) $navigation.style.position = "unset";
     }
   });
   const handleClickLogo = () => {
